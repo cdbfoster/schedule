@@ -17,6 +17,9 @@
 * Copyright 2015 Chris Foster
 */
 
+#ifndef SCHEDULE_ACTIVITY
+#define SCHEDULE_ACTIVITY
+
 #include <list>
 #include <string>
 
@@ -108,3 +111,5 @@ namespace Schedule
 
 	typedef std::list<Activity *> ActivityList;
 }
+
+#endif

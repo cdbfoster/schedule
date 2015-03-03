@@ -17,6 +17,9 @@
 * Copyright 2015 Chris Foster
 */
 
+#ifndef SCHEDULE_OFFSET
+#define SCHEDULE_OFFSET
+
 #include <iostream>
 
 namespace Schedule
@@ -93,3 +96,5 @@ namespace Schedule
 		return a;
 	}
 }
+
+#endif
