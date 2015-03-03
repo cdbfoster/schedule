@@ -73,13 +73,13 @@ void Offset::Initialize(long Hours, long Minutes, long Seconds, bool Negative)
 }
 
 
-long Offset::GetHours() const			{ return Sign * Hours; }
-long Offset::GetMinutes() const		{ return Sign * Minutes; }
-long Offset::GetSeconds() const		{ return Sign * Seconds; }
+long Offset::GetHours() const	{ return Sign * Hours; }
+long Offset::GetMinutes() const	{ return Sign * Minutes; }
+long Offset::GetSeconds() const	{ return Sign * Seconds; }
 
 
-long Offset::GetTotalMinutes() const		{ return (60 * this->GetHours()) + this->GetMinutes(); }
-long Offset::GetTotalSeconds() const		{ return (60 * this->GetTotalMinutes()) + this->GetSeconds(); }
+long Offset::GetTotalMinutes() const { return (60 * this->GetHours()) + this->GetMinutes(); }
+long Offset::GetTotalSeconds() const { return (60 * this->GetTotalMinutes()) + this->GetSeconds(); }
 
 
 Duration Offset::GetHourRemainder() const	{ return Duration(0, Minutes, Seconds, (Sign > 0 ? false : true)); }
@@ -118,9 +118,9 @@ Offset &Offset::operator-=(Offset const &b)
 
 Offset Offset::operator*(float b) const
 {
-	float const Hours			= b * this->GetHours();
-	float const Minutes			= b * this->GetMinutes() + 60 * (Hours - (long)Hours);
-	float const Seconds			= b * this->GetSeconds() + 60 * (Minutes - (long)Minutes);
+	float const Hours	= b * this->GetHours();
+	float const Minutes	= b * this->GetMinutes() + 60 * (Hours - (long)Hours);
+	float const Seconds	= b * this->GetSeconds() + 60 * (Minutes - (long)Minutes);
 
 	return Offset(Hours, Minutes, Seconds);
 }
