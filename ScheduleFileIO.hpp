@@ -16,3 +16,15 @@
 *
 * Copyright 2015 Chris Foster
 */
+
+#include "Schedule.hpp"
+
+namespace Schedule
+{
+	class ScheduleFileIO
+	{
+	public:
+		Schedule	Read(std::string const &FileName);
+		bool		Write(Schedule const &Schedule, std::string const &FileName);
+	};
+}
