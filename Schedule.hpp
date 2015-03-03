@@ -29,6 +29,8 @@ namespace Schedule
 	{
 	public:
 		Schedule(Duration const &Length = Duration(6, 0, 0));
+		Schedule(Schedule &&Other);
+		Schedule(Schedule const &) = delete;
 		~Schedule();
 
 		Duration	GetLength() const;

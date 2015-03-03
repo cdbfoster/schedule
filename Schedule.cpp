@@ -65,9 +65,17 @@ Schedule::Schedule::Schedule(Duration const &Length) :
 }
 
 
+Schedule::Schedule::Schedule(Schedule &&Other) :
+	Data(Other.Data)
+{
+	Other.Data = nullptr;
+}
+
+
 Schedule::Schedule::~Schedule()
 {
-	delete this->Data;
+	if (this->Data != nullptr)
+		delete this->Data;
 }
 
 
