@@ -28,6 +28,7 @@ namespace Schedule
 	{
 	public:
 		Offset();
+		Offset(Offset const &Other) = default;
 		Offset(long Hours, long Minutes, long Seconds, bool Negative = false);
 		~Offset() { }
 
