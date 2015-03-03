@@ -16,3 +16,73 @@
 *
 * Copyright 2015 Chris Foster
 */
+
+#ifndef SCHEDULE_SCHEDULE
+#define SCHEDULE_SCHEDULE
+
+#include "Activity.hpp"
+#include "Offset.hpp"
+
+namespace Schedule
+{
+	class Schedule
+	{
+	public:
+		Schedule(Duration const &Length = Duration(6, 0, 0));
+		~Schedule();
+
+		Duration	GetLength() const;
+		void		SetLength(Duration const &Length);
+
+		// STL-style list handling
+
+		typedef ActivityList::value_type				value_type;
+		typedef ActivityList::reference					reference;
+		typedef ActivityList::const_reference			const_reference;
+		typedef ActivityList::size_type					size_type;
+		typedef ActivityList::iterator					iterator;
+		typedef ActivityList::const_iterator			const_iterator;
+		typedef ActivityList::reverse_iterator			reverse_iterator;
+		typedef ActivityList::const_reverse_iterator	const_reverse_iterator;
+
+		iterator		begin();
+		const_iterator	begin() const;
+		iterator		end();
+		const_iterator	end() const;
+
+		reverse_iterator		rbegin();
+		const_reverse_iterator	rbegin() const;
+		reverse_iterator		rend();
+		const_reverse_iterator	rend() const;
+
+		reference		front();
+		const_reference	front() const;
+		reference		back();
+		const_reference	back() const;
+
+		size_type	size() const;
+		bool		empty() const;
+
+		// push_back and insert take ownership of the added/inserted pointers
+		void		push_back(value_type const &val);
+		iterator	insert(iterator position, value_type const &val);
+		iterator	erase(iterator position);
+		iterator	erase(iterator first, iterator last);
+		void		remove(value_type const &val);
+
+		void BeginActivity(Activity &Activity, Offset const &Beginning);
+		void ClearBeginning(Activity &Activity);
+
+	private:
+		friend class Activity;
+
+		void Update();
+
+	private:
+		struct Implementation;
+
+		Implementation *Data;
+	};
+}
+
+#endif
