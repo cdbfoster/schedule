@@ -271,7 +271,151 @@ void Schedule::Schedule::ClearBeginning(Activity &Activity)
 
 void Schedule::Schedule::Update()
 {
+	// There must be at least one other activity besides the End activity
+	if (this->Data->Activities.size() == 1)
+		return;
 
+	// Convenience
+	ActivityList const &Activities = this->Data->Activities;
+
+	// The first activity must be fixed-absolute
+	Activities.front()->ActivityStartMode = Activity::StartMode::FIXED_ABSOLUTE;
+
+	Duration const ScheduleLength = (*this->Data->EndActivity)->GetDesiredStartTime();
+
+	Offset StartTime;
+	if (Offset const *Beginning = Activities.front()->GetBeginning())
+		StartTime = *Beginning;
+	else
+		StartTime = Activities.front()->GetDesiredStartTime();
+
+	Offset const EndTime = StartTime + ScheduleLength;
+
+	{
+		std::vector<Activity *> FixedActivities;
+
+		for (auto &CurrentActivity : Activities)
+		{
+			if (CurrentActivity->GetStartMode() != Activity::StartMode::FREE || CurrentActivity->GetBeginning() != nullptr ||
+				CurrentActivity->GetLengthMode() != Activity::LengthMode::FREE)
+			{
+				FixedActivities.push_back(CurrentActivity);
+			}
+		}
+
+		std::vector<Activity *>::const_iterator PreviousBeginning = FixedActivities.end();
+		bool PreviousFixedLength = false;
+		Offset CurrentTime = StartTime;
+
+		for (std::vector<Activity *>::const_iterator CurrentActivityIterator = FixedActivities.begin();
+													 CurrentActivityIterator != FixedActivities.end();
+													 ++CurrentActivityIterator)
+		{
+			Activity *CurrentActivity = *CurrentActivityIterator;
+
+			if (Offset const *Beginning = CurrentActivity->GetBeginning())
+			{
+				if (*Beginning < CurrentTime && PreviousBeginning != FixedActivities.end())
+				{
+					Offset AdjustTime = (*PreviousBeginning)->GetActualStartTime();
+
+					if (*Beginning >= AdjustTime)
+					{
+						for (std::vector<Activity *>::const_iterator AdjustActivity = PreviousBeginning;
+																	 AdjustActivity != CurrentActivityIterator;
+																	 ++AdjustActivity)
+						{
+							if ((*AdjustActivity)->GetStartMode() != Activity::StartMode::FREE)
+							{
+								AdjustTime = (*AdjustActivity)->GetActualStartTime();
+
+								if (*Beginning < AdjustTime)
+								{
+									AdjustTime = *Beginning;
+									(*AdjustActivity)->SetActualStartTime(AdjustTime);
+								}
+							}
+
+							if ((*AdjustActivity)->GetLengthMode() != Activity::LengthMode::FREE)
+							{
+								Offset const OldAdjustTime = AdjustTime;
+								AdjustTime += (*AdjustActivity)->GetActualLength();
+
+								if (*Beginning < AdjustTime)
+								{
+									AdjustTime = *Beginning;
+									(*AdjustActivity)->SetActualLength(AdjustTime - OldAdjustTime);
+								}
+							}
+						}
+
+						if (*Beginning > EndTime)
+							CurrentActivity->SetActualStartTime(EndTime);
+						else
+							CurrentActivity->SetActualStartTime(*Beginning);
+
+						CurrentTime = CurrentActivity->GetActualStartTime();
+					}
+					else
+					{
+						CurrentActivity->SetActualStartTime(AdjustTime);
+						CurrentTime = AdjustTime;
+					}
+				}
+				else
+				{
+					if (*Beginning > EndTime)
+						CurrentActivity->SetActualStartTime(EndTime);
+					else
+						CurrentActivity->SetActualStartTime(*Beginning);
+
+					CurrentTime = CurrentActivity->GetActualStartTime();
+				}
+
+				PreviousBeginning = CurrentActivityIterator;
+			}
+			else if (CurrentActivity->GetStartMode() != Activity::StartMode::FREE)
+			{
+				Offset const DesiredStartTime = (CurrentActivity->GetStartMode() == Activity::StartMode::FIXED_ABSOLUTE ?
+																					CurrentActivity->GetDesiredStartTime() :
+																					CurrentActivity->GetDesiredStartTime() + StartTime);
+
+				if (DesiredStartTime < CurrentTime || PreviousFixedLength)
+					CurrentActivity->SetActualStartTime(CurrentTime);
+				else
+				{
+					if (DesiredStartTime > EndTime)
+						CurrentActivity->SetActualStartTime(EndTime);
+					else
+						CurrentActivity->SetActualStartTime(DesiredStartTime);
+
+					CurrentTime = CurrentActivity->GetActualStartTime();
+				}
+			}
+
+			Duration const RemainingTime = EndTime - CurrentTime;
+
+			if (CurrentActivity->GetLengthMode() == Activity::LengthMode::FIXED)
+			{
+				Duration const DesiredLength = CurrentActivity->GetDesiredLength();
+
+				if (DesiredLength > RemainingTime)
+				{
+					CurrentActivity->SetActualLength(RemainingTime);
+					CurrentTime = EndTime;
+				}
+				else
+				{
+					CurrentActivity->SetActualLength(DesiredLength);
+					CurrentTime += DesiredLength;
+				}
+
+				PreviousFixedLength = CurrentActivity->GetStartMode() != Activity::StartMode::FREE;
+			}
+			else
+				PreviousFixedLength = false;
+		}
+	}
 }
 
 
