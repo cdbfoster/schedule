@@ -25,12 +25,12 @@ using namespace Schedule;
 Activity::Activity() :
 	Name("Activity"),
 	DesiredLength(Duration(1, 0, 0)),
-	Beginning(NULL)
+	Beginning(nullptr)
 {
 	this->ActivityStartMode = StartMode::FREE;
 	this->ActivityLengthMode = LengthMode::FREE;
 
-	this->Owner = NULL;
+	this->Owner = nullptr;
 }
 
 
@@ -38,16 +38,16 @@ Activity::Activity(Activity const &Other)
 {
 	*this = Other;
 
-	if (Other.Beginning != NULL)
+	if (Other.Beginning != nullptr)
 		this->Beginning = new Offset(*Other.Beginning);
 
-	this->Owner = NULL;
+	this->Owner = nullptr;
 }
 
 
 Activity::~Activity()
 {
-	if (this->Beginning != NULL)
+	if (this->Beginning != nullptr)
 		delete this->Beginning;
 }
 
@@ -108,7 +108,7 @@ Offset		Activity::GetActualEndTime() const		{ return this->ActualEndTime; }
 
 Offset Activity::GetActualStartTime() const
 {
-	if (this->Beginning != NULL)
+	if (this->Beginning != nullptr)
 		return *this->Beginning;
 	else
 		return this->ActualStartTime;
@@ -135,7 +135,7 @@ Offset const *Activity::GetBeginning() const { return this->Beginning; }
 
 void Activity::SetBeginning(Offset const &Beginning)
 {
-	if (this->Beginning != NULL)
+	if (this->Beginning != nullptr)
 		*this->Beginning = Beginning;
 	else
 		this->Beginning = new Offset(Beginning);
@@ -144,15 +144,15 @@ void Activity::SetBeginning(Offset const &Beginning)
 
 void Activity::ClearBeginning()
 {
-	if (this->Beginning != NULL)
+	if (this->Beginning != nullptr)
 		delete this->Beginning;
 
-	this->Beginning = NULL;
+	this->Beginning = nullptr;
 }
 
 
 void Activity::UpdateSchedule()
 {
-	if (this->Owner != NULL)
+	if (this->Owner != nullptr)
 		this->Owner->Update();
 }
