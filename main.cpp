@@ -200,5 +200,10 @@ int main(int argc, char **argv)
 {
 	std::vector<std::string> const Arguments(argv + 1, argv + argc);
 
+
+	Schedule::Schedule const Test = Schedule::ScheduleFileIO::Read("test.sch");
+
+	DisplaySchedule(Test);
+
 	return 0;
 }
