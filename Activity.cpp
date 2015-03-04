@@ -103,16 +103,8 @@ void Activity::SetDesiredEndTime(Offset const &EndTime)
 
 
 Duration	Activity::GetActualLength() const		{ return this->ActualLength; }
+Offset		Activity::GetActualStartTime() const	{ return this->ActualStartTime; }
 Offset		Activity::GetActualEndTime() const		{ return this->ActualEndTime; }
-
-
-Offset Activity::GetActualStartTime() const
-{
-	if (this->Beginning != nullptr)
-		return *this->Beginning;
-	else
-		return this->ActualStartTime;
-}
 
 
 Duration	Activity::GetOptimalLength() const		{ return this->OptimalLength; }
