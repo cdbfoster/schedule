@@ -17,6 +17,9 @@
 * Copyright 2015 Chris Foster
 */
 
+#ifndef SCHEDULE_SCHEDULEFILEIO
+#define SCHEDULE_SCHEDULEFILEIO
+
 #include "Schedule.hpp"
 
 namespace Schedule
@@ -24,7 +27,9 @@ namespace Schedule
 	class ScheduleFileIO
 	{
 	public:
-		Schedule	Read(std::string const &FileName);
-		bool		Write(Schedule const &Schedule, std::string const &FileName);
+		static Schedule	Read(std::string const &FileName);
+		static bool		Write(Schedule const &Schedule, std::string const &FileName);
 	};
 }
+
+#endif

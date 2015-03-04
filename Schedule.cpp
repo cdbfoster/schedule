@@ -20,8 +20,6 @@
 #include <algorithm>
 #include <set>
 
-#include "Activity.hpp"
-#include "Offset.hpp"
 #include "Schedule.hpp"
 
 using namespace Schedule;
