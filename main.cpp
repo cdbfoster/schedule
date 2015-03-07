@@ -167,7 +167,7 @@ void DisplayActivity(Schedule::Activity &CurrentActivity, unsigned int Index, un
 
 void DisplaySchedule(Schedule::Schedule const &CurrentSchedule)
 {
-	std::cout << "Activies: " << CurrentSchedule.size() << std::endl;
+	std::cout << "Length: " << OffsetTranslator::ToString(CurrentSchedule.GetLength()) << " | Activities: " << CurrentSchedule.size() << std::endl;
 
 	if (CurrentSchedule.size() == 0)
 		return;
