@@ -110,8 +110,16 @@ std::string FixedWidthString(std::string const &Input, unsigned int Width, std::
 }
 
 
+unsigned int VerifyNameWidth(unsigned int NameWidth)
+{
+	return (NameWidth > 30 ? 30 : (NameWidth < 13 ? 13 : NameWidth));
+}
+
+
 void DisplayHeader(unsigned int NameWidth)
 {
+	NameWidth = VerifyNameWidth(NameWidth);
+
 	std::cout << FixedWidthString("Index", 5) << " | " <<
 				 FixedWidthString("Fixed", 5) << " | " <<
 				 FixedWidthString("Start", 8) << " | " <<
@@ -124,6 +132,8 @@ void DisplayHeader(unsigned int NameWidth)
 
 void DisplayActivity(Schedule::Activity &CurrentActivity, unsigned int Index, unsigned int NameWidth)
 {
+	NameWidth = VerifyNameWidth(NameWidth);
+
 	{
 		std::ostringstream Stream;
 
@@ -181,7 +191,7 @@ void DisplaySchedule(Schedule::Schedule const &CurrentSchedule)
 			LongestName = (*ActivityIterator)->GetName().length();
 	}
 
-	LongestName = (LongestName > 30 ? 30 : (LongestName < 13 ? 13 : LongestName));
+	LongestName = VerifyNameWidth(LongestName);
 
 	DisplayHeader(LongestName);
 
@@ -196,14 +206,138 @@ void DisplaySchedule(Schedule::Schedule const &CurrentSchedule)
 }
 
 
+std::vector<std::string> Arguments;
+
+
+template <typename T>
+bool Get(std::vector<std::string>::const_iterator const &Argument, T &Out)
+{
+	if (Argument == Arguments.end())
+		return false;
+
+	std::string const	ArgumentString = *Argument;
+	std::istringstream	Stream(ArgumentString);
+
+	Stream >> Out;
+
+	return !Stream.fail();
+}
+
+
+template <typename T>
+bool Compare(std::vector<std::string>::const_iterator &Argument, T const &Value)
+{
+	if (Argument == Arguments.end())
+		return false;
+
+	T Out;
+	if (!Get(Argument, Out))
+		return false;
+
+	return Value == Out;
+}
+
+
+bool Compare(std::vector<std::string>::const_iterator &Argument, char const *Value)
+{
+	if (Argument == Arguments.end())
+		return false;
+
+	std::string Out;
+	if (!Get(Argument, Out))
+		return false;
+
+	return std::string(Value) == Out;
+}
+
+
 int main(int argc, char **argv)
 {
-	std::vector<std::string> const Arguments(argv + 1, argv + argc);
+	Arguments.insert(Arguments.end(), argv + 1, argv + argc);
+	std::vector<std::string>::const_iterator Argument = Arguments.begin();
 
+	std::string ScheduleFileName = "default.sch";
+	{
+		std::string Next;
+		if (Get(Argument, Next) &&
+			Next != "list" &&
+			Next != "add" &&
+			Next != "move" &&
+			Next != "remove" &&
+			Next != "set" &&
+			Next != "begin" &&
+			Next != "reset" &&
+			Next != "pause" &&
+			Next != "stop" &&
+			Next != "-q")
+		{
+			ScheduleFileName = Next;
 
-	Schedule::Schedule const Test = Schedule::ScheduleFileIO::Read("test.sch");
+			++Argument;
+		}
+	}
 
-	DisplaySchedule(Test);
+	Schedule::Schedule CurrentSchedule = Schedule::ScheduleFileIO::Read(ScheduleFileName);
+
+	bool Quiet = false;
+	if (Compare(Argument, "-q"))
+	{
+		Quiet = true;
+		++Argument;
+	}
+
+	std::string Command;
+	if (Get(Argument, Command))
+		++Argument;
+
+	if ((Command == "list" || Command == "") && !Quiet)
+	{
+		std::string Next;
+		if (Get(Argument, Next))
+		{
+			++Argument;
+
+			if (Next != "-a")
+			{
+				DisplayHelp();
+				return 1;
+			}
+
+			unsigned int ActivityNumber;
+			if (!Get(Argument, ActivityNumber))
+			{
+				DisplayHelp();
+				return 1;
+			}
+
+			if (ActivityNumber == 0 || ActivityNumber > CurrentSchedule.size())
+			{
+				std::cerr << "Activity number out of range." << std::endl;
+				return 2;
+			}
+
+			{
+				unsigned int Index = 1;
+				for (auto Activity : CurrentSchedule)
+				{
+					if (Index == ActivityNumber)
+					{
+						unsigned int const NameWidth = Activity->GetName().size();
+
+						DisplayHeader(NameWidth);
+						DisplayActivity(*Activity, Index, NameWidth);
+						break;
+					}
+
+					Index++;
+				}
+
+				return 0;
+			}
+		}
+		else
+			DisplaySchedule(CurrentSchedule);
+	}
 
 	return 0;
 }
