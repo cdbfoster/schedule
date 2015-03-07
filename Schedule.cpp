@@ -295,7 +295,7 @@ void Schedule::Schedule::Update()
 		// Activities that contain some fixed attribute
 		std::vector<Activity *> FixedActivities;
 
-		for (auto &CurrentActivity : Activities)
+		for (auto CurrentActivity : Activities)
 		{
 			if (CurrentActivity->GetStartMode() != Activity::StartMode::FREE || CurrentActivity->GetBeginning() != nullptr ||
 				CurrentActivity->GetLengthMode() != Activity::LengthMode::FREE)
