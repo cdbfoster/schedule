@@ -281,17 +281,18 @@ void Schedule::Schedule::Update()
 	// The first activity must be fixed-absolute
 	Activities.front()->ActivityStartMode = Activity::StartMode::FIXED_ABSOLUTE;
 
+
+	// Constants
 	Duration const ScheduleLength = (*this->Data->EndActivity)->GetDesiredStartTime();
 
-	Offset StartTime;
-	if (Offset const *Beginning = Activities.front()->GetBeginning())
-		StartTime = *Beginning;
-	else
-		StartTime = Activities.front()->GetDesiredStartTime();
-
+	Offset const StartTime = (Activities.front()->GetBeginning() != nullptr ? *Activities.front()->GetBeginning() :
+																			   Activities.front()->GetDesiredStartTime());
 	Offset const EndTime = StartTime + ScheduleLength;
 
+
+	// Set fixed attributes to actual (start times, beginnings, lengths)
 	{
+		// Activities that contain some fixed attribute
 		std::vector<Activity *> FixedActivities;
 
 		for (auto &CurrentActivity : Activities)
@@ -304,47 +305,51 @@ void Schedule::Schedule::Update()
 		}
 
 		std::vector<Activity *>::const_iterator PreviousBeginning = FixedActivities.end();
-		bool PreviousFixedLength = false;
+		std::vector<Activity *>::const_iterator FixedActivityIterator = FixedActivities.begin();
+		bool FlexibleLength = true;
 		Offset CurrentTime = StartTime;
 
-		for (std::vector<Activity *>::const_iterator CurrentActivityIterator = FixedActivities.begin();
-													 CurrentActivityIterator != FixedActivities.end();
-													 ++CurrentActivityIterator)
+		// Set fixed to actual.  If there's a dispute, beginnings take priority, followed by lengths, followed by start times.
+		for (auto CurrentActivity : Activities)
 		{
-			Activity *CurrentActivity = *CurrentActivityIterator;
-
-			if (Offset const *Beginning = CurrentActivity->GetBeginning())
+			// This activity has a beginning
+			if (Offset const * const Beginning = CurrentActivity->GetBeginning())
 			{
+				// If this activity begins before a previous one allows,
 				if (*Beginning < CurrentTime && PreviousBeginning != FixedActivities.end())
 				{
 					Offset AdjustTime = (*PreviousBeginning)->GetActualStartTime();
 
+					// If the previous beginning is not the issue, chop off the offending time from the activities between
+					// this beginning and the previous
 					if (*Beginning >= AdjustTime)
 					{
-						for (std::vector<Activity *>::const_iterator AdjustActivity = PreviousBeginning;
-																	 AdjustActivity != CurrentActivityIterator;
-																	 ++AdjustActivity)
+						for (std::vector<Activity *>::const_iterator AdjustActivityIterator = PreviousBeginning;
+																	 AdjustActivityIterator != FixedActivityIterator;
+																	 ++AdjustActivityIterator)
 						{
-							if ((*AdjustActivity)->GetStartMode() != Activity::StartMode::FREE)
+							Activity * const AdjustActivity = *AdjustActivityIterator;
+
+							if (AdjustActivity->GetStartMode() != Activity::StartMode::FREE)
 							{
-								AdjustTime = (*AdjustActivity)->GetActualStartTime();
+								AdjustTime = AdjustActivity->GetActualStartTime();
 
 								if (*Beginning < AdjustTime)
 								{
 									AdjustTime = *Beginning;
-									(*AdjustActivity)->SetActualStartTime(AdjustTime);
+									AdjustActivity->SetActualStartTime(AdjustTime);
 								}
 							}
 
-							if ((*AdjustActivity)->GetLengthMode() != Activity::LengthMode::FREE)
+							if (AdjustActivity->GetLengthMode() != Activity::LengthMode::FREE)
 							{
 								Offset const OldAdjustTime = AdjustTime;
-								AdjustTime += (*AdjustActivity)->GetActualLength();
+								AdjustTime += AdjustActivity->GetActualLength();
 
 								if (*Beginning < AdjustTime)
 								{
 									AdjustTime = *Beginning;
-									(*AdjustActivity)->SetActualLength(AdjustTime - OldAdjustTime);
+									AdjustActivity->SetActualLength(AdjustTime - OldAdjustTime);
 								}
 							}
 						}
@@ -356,12 +361,14 @@ void Schedule::Schedule::Update()
 
 						CurrentTime = CurrentActivity->GetActualStartTime();
 					}
+					// Otherwise, this beginning wants to be before the previous beginning.  The previous beginning wins.
 					else
 					{
 						CurrentActivity->SetActualStartTime(AdjustTime);
 						CurrentTime = AdjustTime;
 					}
 				}
+				// No conflict.  Set the beginning where desired.
 				else
 				{
 					if (*Beginning > EndTime)
@@ -372,16 +379,21 @@ void Schedule::Schedule::Update()
 					CurrentTime = CurrentActivity->GetActualStartTime();
 				}
 
-				PreviousBeginning = CurrentActivityIterator;
+				PreviousBeginning = FixedActivityIterator;
+				FlexibleLength = false;
 			}
+			// This activity has a fixed start, but is not yet begun
 			else if (CurrentActivity->GetStartMode() != Activity::StartMode::FREE)
 			{
 				Offset const DesiredStartTime = (CurrentActivity->GetStartMode() == Activity::StartMode::FIXED_ABSOLUTE ?
 																					CurrentActivity->GetDesiredStartTime() :
 																					CurrentActivity->GetDesiredStartTime() + StartTime);
 
-				if (DesiredStartTime < CurrentTime || PreviousFixedLength)
+				// Yield to previous fixed starts/lengths
+				if (DesiredStartTime < CurrentTime || !FlexibleLength)
+				{
 					CurrentActivity->SetActualStartTime(CurrentTime);
+				}
 				else
 				{
 					if (DesiredStartTime > EndTime)
@@ -391,10 +403,13 @@ void Schedule::Schedule::Update()
 
 					CurrentTime = CurrentActivity->GetActualStartTime();
 				}
+
+				FlexibleLength = false;
 			}
 
 			Duration const RemainingTime = EndTime - CurrentTime;
 
+			// Set fixed lengths to actual
 			if (CurrentActivity->GetLengthMode() == Activity::LengthMode::FIXED)
 			{
 				Duration const DesiredLength = CurrentActivity->GetDesiredLength();
@@ -409,11 +424,81 @@ void Schedule::Schedule::Update()
 					CurrentActivity->SetActualLength(DesiredLength);
 					CurrentTime += DesiredLength;
 				}
-
-				PreviousFixedLength = CurrentActivity->GetStartMode() != Activity::StartMode::FREE;
 			}
 			else
-				PreviousFixedLength = false;
+				FlexibleLength = true;
+
+			// Keep the position of the current activity in the fixed list
+			if (CurrentActivity->GetStartMode() != Activity::StartMode::FREE || CurrentActivity->GetBeginning() != nullptr ||
+				CurrentActivity->GetLengthMode() != Activity::LengthMode::FREE)
+			{
+				++FixedActivityIterator;
+			}
+		}
+	}
+
+
+	// Stretch the non-fixed activities to fill the spaces between the fixed activities
+	{
+		Duration ExpandedLength;	// The length of the flexible activities before scaling
+		Duration FixedLength;		// The amount of the space between fixed activities that cannot stretch
+
+		Offset CurrentTime = StartTime;
+
+		ActivityList::const_iterator LowerBound = Activities.end();
+
+		for (ActivityList::const_iterator CurrentActivityIterator = Activities.begin();
+										  CurrentActivityIterator != Activities.end();
+										  ++CurrentActivityIterator)
+		{
+			Activity * const CurrentActivity = *CurrentActivityIterator;
+
+			// If there's a fixed start or a beginning, we've found a boundary of some fixed space
+			if (CurrentActivity->GetStartMode() != Activity::StartMode::FREE || CurrentActivity->GetBeginning() != nullptr)
+			{
+				// If this isn't the very first boundary,
+				if (LowerBound != Activities.end())
+				{
+					ActivityList::const_iterator const UpperBound = CurrentActivityIterator;
+
+					// Calculate the scale to be applied to the activities inside the boundaries
+					Duration const FlexibleLength = (*UpperBound)->GetActualStartTime() - (*LowerBound)->GetActualStartTime() - FixedLength;
+
+					float const FlexibleScale = (!ExpandedLength.IsZero() ? (float)FlexibleLength.GetTotalSeconds() / (float)ExpandedLength.GetTotalSeconds() :
+																			0.0f);
+
+					// Apply the scale to the free-length activities
+					for (auto CurrentActivity : std::vector<Activity *>(LowerBound, UpperBound))
+					{
+						if (CurrentActivity->GetStartMode() == Activity::StartMode::FREE && CurrentActivity->GetBeginning() == nullptr)
+							CurrentActivity->SetActualStartTime(CurrentTime);
+
+						if (CurrentActivity->GetLengthMode() == Activity::LengthMode::FREE)
+						{
+							Duration ActualLength = CurrentActivity->GetDesiredLength() * FlexibleScale;
+
+							if (ActualLength.IsNegative())
+								ActualLength = Duration();
+
+							CurrentActivity->SetActualLength(ActualLength);
+						}
+
+						CurrentTime += CurrentActivity->GetActualLength();
+					}
+
+					// Reset for the next pair of boundaries
+					ExpandedLength = Duration();
+					FixedLength = Duration();
+					LowerBound = UpperBound;
+				}
+				else
+					LowerBound = CurrentActivityIterator;
+			}
+
+			if (CurrentActivity->GetLengthMode() == Activity::LengthMode::FREE)
+				ExpandedLength += CurrentActivity->GetDesiredLength();
+			else
+				FixedLength += CurrentActivity->GetActualLength();
 		}
 	}
 }
