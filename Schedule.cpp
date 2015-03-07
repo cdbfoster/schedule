@@ -67,6 +67,9 @@ Schedule::Schedule::Schedule(Schedule &&Other) :
 	Data(Other.Data)
 {
 	Other.Data = nullptr;
+
+	for (auto Activity : this->Data->Activities)
+		Activity->Owner = this;
 }
 
 
