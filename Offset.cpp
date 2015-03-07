@@ -116,13 +116,22 @@ Offset &Offset::operator-=(Offset const &b)
 }
 
 
+long Round(float Value)
+{
+	return (Value > 0.0f ? Value + 0.5f :
+						   Value - 0.5f);
+}
+
+
 Offset Offset::operator*(float b) const
 {
 	float const Hours	= b * this->GetHours();
 	float const Minutes	= b * this->GetMinutes() + 60 * (Hours - (long)Hours);
 	float const Seconds	= b * this->GetSeconds() + 60 * (Minutes - (long)Minutes);
 
-	return Offset(Hours, Minutes, Seconds);
+	return Offset(Hours,
+				  Minutes,
+				  Round(Seconds));
 }
 
 
