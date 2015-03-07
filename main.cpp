@@ -224,6 +224,16 @@ bool Get(std::vector<std::string>::const_iterator const &Argument, T &Out)
 }
 
 
+bool Get(std::vector<std::string>::const_iterator const &Argument, std::string &Out)
+{
+	if (Argument == Arguments.end())
+		return false;
+
+	Out = *Argument;
+	return true;
+}
+
+
 template <typename T>
 bool Compare(std::vector<std::string>::const_iterator &Argument, T const &Value)
 {
@@ -290,6 +300,7 @@ int main(int argc, char **argv)
 	if (Get(Argument, Command))
 		++Argument;
 
+
 	if ((Command == "list" || Command == "") && !Quiet)
 	{
 		std::string Next;
@@ -336,6 +347,199 @@ int main(int argc, char **argv)
 			}
 		}
 		else
+			DisplaySchedule(CurrentSchedule);
+	}
+
+
+	else if (Command == "add" || Command == "set")
+	{
+		// Get the index of the activity to modify if were're setting and not adding
+		unsigned int SelectedIndex;
+		if (Command == "set")
+		{
+			if (Compare(Argument, "-l"))
+			{
+				++Argument;
+
+				std::string Next;
+				if (!Get(Argument, Next))
+				{
+					DisplayHelp();
+					return 1;
+				}
+
+				CurrentSchedule.SetLength(OffsetTranslator::ToOffset(Next));
+				Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+
+				return 0;
+			}
+			else
+			{
+				if (!Get(Argument, SelectedIndex))
+				{
+					DisplayHelp();
+					return 1;
+				}
+				else
+					++Argument;
+
+				if (SelectedIndex == 0 || SelectedIndex > CurrentSchedule.size())
+				{
+					std::cerr << "Activity number out of range." << std::endl;
+					return 2;
+				}
+			}
+		}
+
+
+		// Read all of the following arguments into a map
+		std::map<std::string, std::string> ArgumentMap;
+		{
+			std::string Next;
+			while (Get(Argument, Next))
+			{
+				if ((Command == "add" && Next != "-b") &&
+					Next != "-n" &&
+					Next != "-l" &&
+					Next != "-fs" &&
+					Next != "-fl" &&
+					Next != "-s" &&
+					Next != "-q")
+				{
+					DisplayHelp();
+					return 1;
+				}
+
+				if (ArgumentMap.find(Next) != ArgumentMap.end())
+				{
+					std::cerr << "Duplicate arguments: " << Next << std::endl;
+					return 2;
+				}
+				else
+					++Argument;
+
+				std::string Value;
+				if (!Get(Argument, Value))
+				{
+					DisplayHelp();
+					return 1;
+				}
+				else
+					++Argument;
+
+				ArgumentMap.insert(std::make_pair(Next, Value));
+			}
+		}
+
+
+		// Create or find the activity to modifiy
+		Schedule::Activity *CurrentActivity;
+		{
+			if (Command == "add")
+				CurrentActivity = new Schedule::Activity;
+			else
+			{
+				unsigned int Index = 1;
+				for (auto Activity : CurrentSchedule)
+				{
+					if (Index == SelectedIndex)
+					{
+						CurrentActivity = Activity;
+						break;
+					}
+
+					Index++;
+				}
+			}
+		}
+
+
+		// Go through the arguments and make the requested changes
+		{
+			Schedule::Schedule::iterator BeforeActivity = CurrentSchedule.end();
+
+			for (auto &Pair : ArgumentMap)
+			{
+				if (Pair.first == "-b")
+				{
+					unsigned int BeforeNumber;
+					if ((std::istringstream(Pair.second) >> BeforeNumber).fail())
+					{
+						DisplayHelp();
+						delete CurrentActivity;
+						return 1;
+					}
+
+					if (BeforeNumber == 0 || BeforeNumber > CurrentSchedule.size())
+					{
+						std::cerr << "Activity number out of range." << std::endl;
+						return 2;
+					}
+
+					unsigned int Index = 1;
+					for (Schedule::Schedule::iterator ActivityIterator = CurrentSchedule.begin();
+													  ActivityIterator != CurrentSchedule.end();
+													  ++ActivityIterator, Index++)
+					{
+						if (Index == BeforeNumber)
+						{
+							BeforeActivity = ActivityIterator;
+							break;
+						}
+					}
+				}
+				else if (Pair.first == "-n")
+					CurrentActivity->SetName(Pair.second);
+				else if (Pair.first == "-fs")
+				{
+					if (Pair.second != "f" && Pair.second != "a" && Pair.second != "r")
+					{
+						DisplayHelp();
+
+						if (Command == "add")
+							delete CurrentActivity;
+
+						return 1;
+					}
+
+					CurrentActivity->SetStartMode(Pair.second == "f" ? Schedule::Activity::StartMode::FREE :
+												 (Pair.second == "a" ? Schedule::Activity::StartMode::FIXED_ABSOLUTE :
+																	   Schedule::Activity::StartMode::FIXED_RELATIVE));
+				}
+				else if (Pair.first == "-s")
+					CurrentActivity->SetDesiredStartTime(OffsetTranslator::ToOffset(Pair.second));
+				else if (Pair.first == "-fl")
+				{
+					if (Pair.second != "f" && Pair.second != "a")
+					{
+						DisplayHelp();
+
+						if (Command == "add")
+							delete CurrentActivity;
+
+						return 1;
+					}
+
+					CurrentActivity->SetLengthMode(Pair.second == "f" ? Schedule::Activity::LengthMode::FREE : Schedule::Activity::LengthMode::FIXED);
+				}
+				else if (Pair.first == "-l")
+					CurrentActivity->SetDesiredLength(OffsetTranslator::ToOffset(Pair.second));
+			}
+
+			if (Command == "add")
+			{
+				if (BeforeActivity == CurrentSchedule.end())
+					CurrentSchedule.push_back(CurrentActivity);
+				else
+					CurrentSchedule.insert(BeforeActivity, CurrentActivity);
+			}
+		}
+
+
+		// Write the schedule
+		Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+
+		if (!Quiet)
 			DisplaySchedule(CurrentSchedule);
 	}
 
