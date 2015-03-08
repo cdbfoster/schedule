@@ -188,7 +188,7 @@ bool Schedule::Schedule::empty() const
 
 void Schedule::Schedule::push_back(value_type const &val)
 {
-	if (val->Owner != NULL && val->Owner != this)
+	if (val->Owner != nullptr && val->Owner != this)
 		val->Owner->remove(val);
 
 	val->Owner = this;
@@ -203,7 +203,7 @@ void Schedule::Schedule::push_back(value_type const &val)
 
 Schedule::Schedule::iterator Schedule::Schedule::insert(iterator position, value_type const &val)
 {
-	if (val->Owner != NULL && val->Owner != this)
+	if (val->Owner != nullptr && val->Owner != this)
 		val->Owner->remove(val);
 
 	val->Owner = this;
@@ -224,7 +224,7 @@ Schedule::Schedule::iterator Schedule::Schedule::erase(iterator position)
 	if (position == this->end())
 		return this->end();
 
-	(*position)->Owner = NULL;
+	(*position)->Owner = nullptr;
 	iterator Result = this->Data->Activities.erase(position);
 
 	this->Update();

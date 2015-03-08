@@ -543,5 +543,58 @@ int main(int argc, char **argv)
 			DisplaySchedule(CurrentSchedule);
 	}
 
+
+	else if (Command == "move")
+	{
+		unsigned int MoveNumber;
+		unsigned int BeforeNumber;
+
+		if (!Get(Argument, MoveNumber) ||
+			!Get(Argument + 1, BeforeNumber))
+		{
+			DisplayHelp();
+			return 1;
+		}
+		else
+			Argument += 2;
+
+		if (MoveNumber == 0 || MoveNumber > CurrentSchedule.size() ||
+			BeforeNumber == 0 || BeforeNumber > CurrentSchedule.size())
+		{
+			std::cerr << "Activity number out of range." << std::endl;
+			return 2;
+		}
+
+		Schedule::Schedule::iterator MoveActivityIterator	= CurrentSchedule.end();
+		Schedule::Schedule::iterator BeforeActivityIterator	= CurrentSchedule.end();
+
+		unsigned int Index = 1;
+		for (Schedule::Schedule::iterator ActivityIterator = CurrentSchedule.begin();
+										  ActivityIterator != CurrentSchedule.end();
+										  ++ActivityIterator, Index++)
+		{
+			if (Index == MoveNumber)
+				MoveActivityIterator = ActivityIterator;
+			if (Index == BeforeNumber)
+				BeforeActivityIterator = ActivityIterator;
+
+			if (MoveActivityIterator != CurrentSchedule.end() && BeforeActivityIterator != CurrentSchedule.end())
+				break;
+		}
+
+		Schedule::Activity * const MoveActivity = *MoveActivityIterator;
+		CurrentSchedule.erase(MoveActivityIterator);
+
+		if (MoveNumber == BeforeNumber)
+			CurrentSchedule.push_back(MoveActivity);
+		else
+			CurrentSchedule.insert(BeforeActivityIterator, MoveActivity);
+
+		Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+
+		if (!Quiet)
+			DisplaySchedule(CurrentSchedule);
+	}
+
 	return 0;
 }
