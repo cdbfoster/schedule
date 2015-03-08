@@ -111,13 +111,6 @@ Schedule::Schedule ScheduleFileIO::Read(std::string const &FileName)
 				if (boost::optional<std::string> Name = Child->second.get_optional<std::string>("Name"))
 					NewActivity->SetName(*Name);
 
-				if (boost::optional<std::string> LengthMode = Child->second.get_optional<std::string>("LengthMode"))
-					NewActivity->SetLengthMode(*LengthMode == "Fixed" ? Activity::LengthMode::FIXED :
-																		Activity::LengthMode::FREE);
-
-				if (boost::optional<Duration> Length = Child->second.get_optional<Duration>("Length", Translator))
-					NewActivity->SetDesiredLength(*Length);
-
 				if (boost::optional<std::string> StartMode = Child->second.get_optional<std::string>("StartMode"))
 					NewActivity->SetStartMode(*StartMode == "Fixed-Absolute" ? Activity::StartMode::FIXED_ABSOLUTE :
 											 (*StartMode == "Fixed-Relative" ? Activity::StartMode::FIXED_RELATIVE :
@@ -125,6 +118,13 @@ Schedule::Schedule ScheduleFileIO::Read(std::string const &FileName)
 
 				if (boost::optional<Offset> Start = Child->second.get_optional<Offset>("Start", Translator))
 					NewActivity->SetDesiredStartTime(*Start);
+
+				if (boost::optional<std::string> LengthMode = Child->second.get_optional<std::string>("LengthMode"))
+					NewActivity->SetLengthMode(*LengthMode == "Fixed" ? Activity::LengthMode::FIXED :
+																		Activity::LengthMode::FREE);
+
+				if (boost::optional<Duration> Length = Child->second.get_optional<Duration>("Length", Translator))
+					NewActivity->SetDesiredLength(*Length);
 
 				Staging.push_back(NewActivity);
 
@@ -167,17 +167,17 @@ bool ScheduleFileIO::Write(Schedule const &Schedule, std::string const &FileName
 		if (!CurrentActivity.GetName().empty())
 			ActivityNode.put("Name", CurrentActivity.GetName());
 
-		if (CurrentActivity.GetLengthMode() != Activity::LengthMode::FREE)
-			ActivityNode.put("LengthMode", "Fixed");
-
-		ActivityNode.put("Length", CurrentActivity.GetDesiredLength(), Translator);
-
 		if (CurrentActivity.GetStartMode() != Activity::StartMode::FREE)
 			ActivityNode.put("StartMode", (CurrentActivity.GetStartMode() == Activity::StartMode::FIXED_ABSOLUTE ?
 											   "Fixed-Absolute" : "Fixed-Relative"));
 
 		if (!CurrentActivity.GetDesiredStartTime().IsZero())
 			ActivityNode.put("Start", CurrentActivity.GetDesiredStartTime(), Translator);
+
+		if (CurrentActivity.GetLengthMode() != Activity::LengthMode::FREE)
+			ActivityNode.put("LengthMode", "Fixed");
+
+		ActivityNode.put("Length", CurrentActivity.GetDesiredLength(), Translator);
 
 		if (Offset const *Beginning = CurrentActivity.GetBeginning())
 			ActivityNode.put("Beginning", *Beginning, Translator);
