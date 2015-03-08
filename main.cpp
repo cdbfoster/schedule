@@ -555,8 +555,6 @@ int main(int argc, char **argv)
 			DisplayHelp();
 			return 1;
 		}
-		else
-			Argument += 2;
 
 		if (MoveNumber == 0 || MoveNumber > CurrentSchedule.size() ||
 			BeforeNumber == 0 || BeforeNumber > CurrentSchedule.size())
@@ -589,6 +587,44 @@ int main(int argc, char **argv)
 			CurrentSchedule.push_back(MoveActivity);
 		else
 			CurrentSchedule.insert(BeforeActivityIterator, MoveActivity);
+
+		Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+
+		if (!Quiet)
+			DisplaySchedule(CurrentSchedule);
+	}
+
+
+	else if (Command == "remove")
+	{
+		unsigned int RemoveNumber;
+		if (!Get(Argument, RemoveNumber))
+		{
+			DisplayHelp();
+			return 1;
+		}
+
+		if (RemoveNumber == 0 || RemoveNumber > CurrentSchedule.size())
+		{
+			std::cerr << "Activity number out of range." << std::endl;
+			return 2;
+		}
+
+		unsigned int Index = 1;
+		for (Schedule::Schedule::iterator ActivityIterator = CurrentSchedule.begin();
+										  ActivityIterator != CurrentSchedule.end();
+										  ++ActivityIterator, Index++)
+		{
+			if (Index == RemoveNumber)
+			{
+				Schedule::Activity * const RemoveActivity = *ActivityIterator;
+
+				CurrentSchedule.erase(ActivityIterator);
+				delete RemoveActivity;
+
+				break;
+			}
+		}
 
 		Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
 
