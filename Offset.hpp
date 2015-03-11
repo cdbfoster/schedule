@@ -69,6 +69,8 @@ namespace Schedule
 		bool IsNegative() const;
 		bool IsZero() const;
 
+		static Offset GetLocalTimeOfDay();
+
 	private:
 		long	Hours;
 		short	Minutes;

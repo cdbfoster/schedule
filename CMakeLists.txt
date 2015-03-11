@@ -34,13 +34,13 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 # Use -DBOOST_ROOT="path/to/boost" to use a custom installation of boost.
 
-set(BOOST_COMPONENTS)# chrono date_time system thread)
+set(BOOST_COMPONENTS date_time)
 
 if(BOOST_ROOT)
 	set(Boost_NO_SYSTEM_PATHS TRUE)
 endif()
 
-#find_package(Boost COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
+find_package(Boost COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
 
 # Source ==================================================
 

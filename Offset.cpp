@@ -17,6 +17,8 @@
 * Copyright 2015 Chris Foster
 */
 
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include "Offset.hpp"
 
 using namespace Schedule;
@@ -228,4 +230,15 @@ bool Offset::IsZero() const
 	if (this->GetMinutes() != 0)
 		return false;
 	return this->GetSeconds() == 0;
+}
+
+
+Offset Offset::GetLocalTimeOfDay()
+{
+	using namespace boost::posix_time;
+
+	ptime const			LocalTime = second_clock::local_time();
+	time_duration const	LocalOffset = LocalTime.time_of_day();
+
+	return Offset(LocalOffset.hours(), LocalOffset.minutes(), LocalOffset.seconds());
 }
