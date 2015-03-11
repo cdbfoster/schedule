@@ -730,7 +730,7 @@ int main(int argc, char **argv)
 			}
 			else if (ActiveBreak->GetName() == "Stop")
 			{
-
+				// XXX Delete activities between active stop and begin time
 			}
 
 			ActiveBreak->SetDesiredLength(BreakLength);
@@ -741,6 +741,59 @@ int main(int argc, char **argv)
 		// Begin the activity and write it to the schedule
 		CurrentSchedule.BeginActivity(*BeginActivity, BeginOffset);
 		Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+
+		if (!Quiet)
+			DisplaySchedule(CurrentSchedule);
+	}
+
+
+	else if (Command == "reset")
+	{
+		unsigned int ResetNumber = 0;
+		if (!Get(Argument, ResetNumber))
+		{
+			Schedule::Schedule::iterator Previous = CurrentSchedule.end();
+
+			for (Schedule::Schedule::iterator ActivityIterator = CurrentSchedule.begin();
+											  ActivityIterator != CurrentSchedule.end();
+											  Previous = ActivityIterator++)
+			{
+				if ((*ActivityIterator)->GetName() == "Pause" || (*ActivityIterator)->GetName() == "Stop")
+				{
+					Schedule::Activity * const Break = *ActivityIterator;
+					CurrentSchedule.erase(ActivityIterator);
+					delete Break;
+
+					// XXX Rejoin split activities
+				}
+				else
+					CurrentSchedule.ClearBeginning(**ActivityIterator);
+			}
+
+			Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+		}
+		else
+		{
+			if (ResetNumber == 0 || ResetNumber > CurrentSchedule.size())
+			{
+				std::cerr << "Activity number out of range." << std::endl;
+				return 2;
+			}
+
+			unsigned int Index = 1;
+			for (auto Activity : CurrentSchedule)
+			{
+				if (Index == ResetNumber)
+				{
+					CurrentSchedule.ClearBeginning(*Activity);
+					break;
+				}
+
+				Index++;
+			}
+
+			Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+		}
 
 		if (!Quiet)
 			DisplaySchedule(CurrentSchedule);
