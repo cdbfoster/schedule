@@ -272,9 +272,9 @@ int main(int argc, char **argv)
 		if (Get(Argument, Next) &&
 			Next != "list" &&
 			Next != "add" &&
+			Next != "set" &&
 			Next != "move" &&
 			Next != "remove" &&
-			Next != "set" &&
 			Next != "begin" &&
 			Next != "reset" &&
 			Next != "pause" &&
@@ -626,6 +626,120 @@ int main(int argc, char **argv)
 			}
 		}
 
+		Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
+
+		if (!Quiet)
+			DisplaySchedule(CurrentSchedule);
+	}
+
+
+	else if (Command == "begin")
+	{
+		// Find the number of the activity to begin, specified or otherwise
+		unsigned int BeginNumber = 0;
+		if (!Get(Argument, BeginNumber))
+		{
+			unsigned int Index = CurrentSchedule.size();
+			for (Schedule::Schedule::const_reverse_iterator ActivityIterator = CurrentSchedule.rbegin();
+															ActivityIterator != CurrentSchedule.rend();
+															++ActivityIterator, Index--)
+			{
+				Schedule::Activity const * const CurrentActivity = *ActivityIterator;
+				if (CurrentActivity->GetBeginning() == nullptr && CurrentActivity->GetName() != "Pause" &&
+																  CurrentActivity->GetName() != "Stop")
+					BeginNumber = Index;
+				else
+					break;
+			}
+		}
+		else
+			++Argument;
+
+		if (BeginNumber == 0 || BeginNumber > CurrentSchedule.size())
+		{
+			std::cerr << "Activity number out of range." << std::endl;
+			return 2;
+		}
+
+
+		// Find the activity to begin, and the active break if there is one
+		Schedule::Activity					   *BeginActivity;
+		Schedule::Activity					   *ActiveBreak = nullptr;
+		Schedule::Schedule::reverse_iterator	ActiveBreakIterator = CurrentSchedule.rend();
+		{
+			unsigned int Index = CurrentSchedule.size();
+			Schedule::Schedule::reverse_iterator ActivityIterator;
+			for (ActivityIterator = CurrentSchedule.rbegin();
+				 ActivityIterator != CurrentSchedule.rend();
+				 ++ActivityIterator, Index--)
+			{
+				if (Index == BeginNumber)
+				{
+					BeginActivity = *ActivityIterator;
+
+					if (BeginActivity->GetName() == "Pause" || BeginActivity->GetName() == "Stop")
+					{
+						std::cerr << "Cannot begin a pause or a stop." << std::endl;
+						return 2;
+					}
+
+					break;
+				}
+			}
+
+			for (; ActivityIterator != CurrentSchedule.rend();
+				   ++ActivityIterator)
+			{
+				Schedule::Activity * const CurrentActivity = *ActivityIterator;
+
+				if (CurrentActivity->GetName() == "Pause" || CurrentActivity->GetName() == "Stop")
+				{
+					if (CurrentActivity->GetLengthMode() != Schedule::Activity::LengthMode::FIXED)
+					{
+						ActiveBreak = CurrentActivity;
+						ActiveBreakIterator = ActivityIterator;
+					}
+
+					// Only check the first break we come to
+					break;
+				}
+			}
+		}
+
+
+		// Get the beginning time, specified or otherwise
+		Schedule::Offset BeginOffset;
+		{
+			std::string Next;
+			if (!Get(Argument, Next))
+				BeginOffset = Schedule::Offset::GetLocalTimeOfDay();
+			else
+				BeginOffset = OffsetTranslator::ToOffset(Next);
+		}
+
+
+		// Close the active break if there is one
+		if (ActiveBreak != nullptr)
+		{
+			Schedule::Duration const BreakLength = BeginOffset - ActiveBreak->GetActualStartTime();
+
+			if (BreakLength.IsNegative())
+			{
+				std::cerr << "The beginning time is earlier than the active pause or stop." << std::endl;
+				return 2;
+			}
+			else if (ActiveBreak->GetName() == "Stop")
+			{
+
+			}
+
+			ActiveBreak->SetDesiredLength(BreakLength);
+			ActiveBreak->SetLengthMode(Schedule::Activity::LengthMode::FIXED);
+		}
+
+
+		// Begin the activity and write it to the schedule
+		CurrentSchedule.BeginActivity(*BeginActivity, BeginOffset);
 		Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
 
 		if (!Quiet)
