@@ -370,6 +370,9 @@ int main(int argc, char **argv)
 				CurrentSchedule.SetLength(OffsetTranslator::ToOffset(Next));
 				Schedule::ScheduleFileIO::Write(CurrentSchedule, ScheduleFileName);
 
+				if (!Quiet)
+					DisplaySchedule(CurrentSchedule);
+
 				return 0;
 			}
 			else
