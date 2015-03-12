@@ -29,12 +29,6 @@
 #include "Schedule.hpp"
 #include "ScheduleFileIO.hpp"
 
-void DisplayHelp()
-{
-	std::cout << "You have no idea what you're doing, do you?" << std::endl;
-}
-
-
 struct OffsetTranslator
 {
 	static Schedule::Offset ToOffset(std::string const &String)
@@ -261,6 +255,135 @@ bool Compare(std::vector<std::string>::const_iterator &Argument, char const *Val
 }
 
 
+void DisplayHelp()
+{
+	std::vector<std::string>::const_iterator Argument = Arguments.begin();
+
+	// Skip over the file, quiet, and help arguments
+	{
+		std::string Next;
+		if (Get(Argument, Next) &&
+			Next != "list" &&
+			Next != "add" &&
+			Next != "set" &&
+			Next != "move" &&
+			Next != "remove" &&
+			Next != "begin" &&
+			Next != "reset" &&
+			Next != "pause" &&
+			Next != "-q")
+		{
+			++Argument;
+		}
+
+		if (Compare(Argument, "-q"))
+			++Argument;
+
+		if (Compare(Argument, "-h") || Compare(Argument, "--help"))
+			++Argument;
+	}
+
+	std::string Command;
+	if (Get(Argument, Command))
+		++Argument;
+
+	std::vector<std::pair<std::string, std::string>> Usages = {
+		{"list",	"list [Activity]\n\n"
+		 "List the schedule.  Optionally, list only Activity."},
+		{"add",		"add [-b Before] [-n Name] [-fs (f | a | r)] [-s Start] [-fl (f | a)] [-l Length]\n\n"
+		 "Add a new activity to the schedule.\n"
+		 " -b    Insert the new activity before Before.\n\n"
+		 " -n    Set the new activity's name to Name.\n\n"
+		 " -fs   Specify the new activity's start mode:\n"
+		 "         f - Free (default)\n"
+		 "         a - Fixed-Absolute\n"
+		 "         r - Fixed-Relative\n\n"
+		 " -s    Set the new activity's desired start time to Start.\n"
+		 "       Times are specified in the format hh:mm:ss\n\n"
+		 " -fl   Specify the new activity's length mode:\n"
+		 "         f - Free (default)\n"
+		 "         a - Fixed\n\n"
+		 " -l    Set the new activity's desired length to Length.\n"
+		 "       Times are specified in the format hh:mm:ss"},
+		{"set",		"set -l Length\n\n"
+		 "Set the schedule's length:\n"
+		 " -l    Set the schedule's length to Length.\n"
+		 "       Times are specified in the format hh:mm:ss\n\n"
+		 " schedule set Activity [-n Name] [-fs (f | a | r)] [-s Start] [-fl (f | a)] [-l Length])\n\n"
+		 "Set Activity's details:\n"
+		 " -n    Set the activity's name to Name.\n\n"
+		 " -fs   Specify the activity's start mode:\n"
+		 "         f - Free\n"
+		 "         a - Fixed-Absolute\n"
+		 "         r - Fixed-Relative\n\n"
+		 " -s    Set the activity's desired start time to Start.\n"
+		 "       Times are specified in the format hh:mm:ss\n\n"
+		 " -fl   Specify the activity's length mode:\n"
+		 "         f - Free\n"
+		 "         a - Fixed\n\n"
+		 " -l    Set the activity's desired length to Length.\n"
+		 "       Times are specified in the format hh:mm:ss"},
+		{"move",	"move Activity Before\n\n"
+		 "Move Activity before Before.  If Activity is equal to Before, Activity is moved\n"
+		 "to the end of the schedule."},
+		{"remove",	"remove Activity\n\n"
+		 "Delete Activity from the schedule."},
+		{"begin",	"begin [Activity [BeginTime]]\n\n"
+		 "Begin an activity.  If no activity is specified, the next unbegun activity is\n"
+		 "begun, at the current time of day.  The beginning time can be specified only if\n"
+		 "the activity to begin is also specified.  This also ends an active pause in the\n"
+		 "schedule, if there is one."},
+		{"reset",	"reset [Activity]\n\n"
+		 "Reset all beginnings in the schedule, and delete all pauses.  Activities that were\n"
+		 "split by pauses are joined again.  If Activity is specified, reset only Activity."},
+		{"pause",	"pause [PauseTime]\n\n"
+		 "Insert a pause at the current time of day or at the specified pause time.  Activities\n"
+		 "intersected by the pause are split such that the parts equal the unpaused whole."}
+	};
+
+	if (Command == "" ||
+	   (Command != "list" &&
+		Command != "add" &&
+		Command != "set" &&
+		Command != "move" &&
+		Command != "remove" &&
+		Command != "begin" &&
+		Command != "reset" &&
+		Command != "pause"))
+	{
+		std::cout << "Usage:\n"
+					 " schedule [File] [-q] [Command] [Options...]\n\n"
+					 "A small daily scheduling program that scales activities according to the amount of\n"
+					 "time available in the schedule.\n"
+					 " File       The schedule file to use.  If omitted, default.sch is used.\n\n"
+					 " -q         Quiet mode.\n\n"
+					 " Command    The command to execute.  Commands are:\n"
+					 "              list (default, if omitted)\n"
+					 "              add\n"
+					 "              set\n"
+					 "              move\n"
+					 "              remove\n"
+					 "              begin\n"
+					 "              reset\n"
+					 "              pause\n\n"
+					 "Use \"schedule --help Command\" for more info on Command." << std::endl;
+	}
+	else
+	{
+		for (auto &Usage : Usages)
+		{
+			if (Command == Usage.first)
+			{
+				std::cout << "Usage:\n"
+							 " schedule " << Usage.second << std::endl;
+
+				break;
+			}
+		}
+	}
+}
+
+
 int main(int argc, char **argv)
 {
 	Arguments.insert(Arguments.end(), argv + 1, argv + argc);
@@ -278,7 +401,9 @@ int main(int argc, char **argv)
 			Next != "begin" &&
 			Next != "reset" &&
 			Next != "pause" &&
-			Next != "-q")
+			Next != "-q" &&
+			Next != "-h" &&
+			Next != "--help")
 		{
 			ScheduleFileName = Next;
 
@@ -286,14 +411,22 @@ int main(int argc, char **argv)
 		}
 	}
 
-	Schedule::Schedule CurrentSchedule = Schedule::ScheduleFileIO::Read(ScheduleFileName);
-
 	bool Quiet = false;
 	if (Compare(Argument, "-q"))
 	{
 		Quiet = true;
 		++Argument;
 	}
+
+	if (Compare(Argument, "-h") || Compare(Argument, "--help"))
+	{
+		DisplayHelp();
+		return 0;
+	}
+
+
+	Schedule::Schedule CurrentSchedule = Schedule::ScheduleFileIO::Read(ScheduleFileName);
+
 
 	std::string Command;
 	if (Get(Argument, Command))
@@ -305,14 +438,6 @@ int main(int argc, char **argv)
 		std::string Next;
 		if (Get(Argument, Next))
 		{
-			++Argument;
-
-			if (Next != "-a")
-			{
-				DisplayHelp();
-				return 1;
-			}
-
 			unsigned int ActivityNumber;
 			if (!Get(Argument, ActivityNumber))
 			{
@@ -402,11 +527,10 @@ int main(int argc, char **argv)
 			{
 				if ((Command == "add" && Next != "-b") &&
 					Next != "-n" &&
-					Next != "-l" &&
 					Next != "-fs" &&
-					Next != "-fl" &&
 					Next != "-s" &&
-					Next != "-q")
+					Next != "-fl" &&
+					Next != "-l")
 				{
 					DisplayHelp();
 					return 1;
@@ -921,6 +1045,8 @@ int main(int argc, char **argv)
 		if (!Quiet)
 			DisplaySchedule(CurrentSchedule);
 	}
+	else
+		DisplayHelp();
 
 	return 0;
 }
