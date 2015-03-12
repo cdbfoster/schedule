@@ -142,7 +142,7 @@ void DisplayActivity(Schedule::Activity &CurrentActivity, unsigned int Index, un
 		std::cout << FixedWidthString(Stream.str(), 5, std::internal) << "   ";
 	}
 
-	if (CurrentActivity.GetName() != "Pause" && CurrentActivity.GetName() != "Stop")
+	if (CurrentActivity.GetName() != "Pause")
 	{
 		{
 			std::string FixedString = std::string(CurrentActivity.GetStartMode() == Schedule::Activity::StartMode::FREE ? "-- " :
@@ -163,7 +163,7 @@ void DisplayActivity(Schedule::Activity &CurrentActivity, unsigned int Index, un
 	}
 	else
 	{
-		std::cout << " " << CurrentActivity.GetName() << " ";
+		std::cout << " Pause ";
 
 		if (CurrentActivity.GetLengthMode() != Schedule::Activity::LengthMode::FIXED)
 			std::cout << "initiated at " << OffsetTranslator::ToString(CurrentActivity.GetActualStartTime()) << std::endl;
@@ -278,7 +278,6 @@ int main(int argc, char **argv)
 			Next != "begin" &&
 			Next != "reset" &&
 			Next != "pause" &&
-			Next != "stop" &&
 			Next != "-q")
 		{
 			ScheduleFileName = Next;
@@ -618,7 +617,6 @@ int main(int argc, char **argv)
 			if (Index == RemoveNumber)
 			{
 				Schedule::Activity * const RemoveActivity = *ActivityIterator;
-
 				CurrentSchedule.erase(ActivityIterator);
 				delete RemoveActivity;
 
@@ -645,8 +643,7 @@ int main(int argc, char **argv)
 															++ActivityIterator, Index--)
 			{
 				Schedule::Activity const * const CurrentActivity = *ActivityIterator;
-				if (CurrentActivity->GetBeginning() == nullptr && CurrentActivity->GetName() != "Pause" &&
-																  CurrentActivity->GetName() != "Stop")
+				if (CurrentActivity->GetBeginning() == nullptr && CurrentActivity->GetName() != "Pause")
 					BeginNumber = Index;
 				else
 					break;
@@ -662,10 +659,10 @@ int main(int argc, char **argv)
 		}
 
 
-		// Find the activity to begin, and the active break if there is one
+		// Find the activity to begin, and the active pause if there is one
 		Schedule::Activity					   *BeginActivity;
-		Schedule::Activity					   *ActiveBreak = nullptr;
-		Schedule::Schedule::reverse_iterator	ActiveBreakIterator = CurrentSchedule.rend();
+		Schedule::Activity					   *ActivePause = nullptr;
+		Schedule::Schedule::reverse_iterator	ActivePauseIterator = CurrentSchedule.rend();
 		{
 			unsigned int Index = CurrentSchedule.size();
 			Schedule::Schedule::reverse_iterator ActivityIterator;
@@ -677,9 +674,9 @@ int main(int argc, char **argv)
 				{
 					BeginActivity = *ActivityIterator;
 
-					if (BeginActivity->GetName() == "Pause" || BeginActivity->GetName() == "Stop")
+					if (BeginActivity->GetName() == "Pause")
 					{
-						std::cerr << "Cannot begin a pause or a stop." << std::endl;
+						std::cerr << "Cannot begin a pause." << std::endl;
 						return 2;
 					}
 
@@ -692,15 +689,15 @@ int main(int argc, char **argv)
 			{
 				Schedule::Activity * const CurrentActivity = *ActivityIterator;
 
-				if (CurrentActivity->GetName() == "Pause" || CurrentActivity->GetName() == "Stop")
+				if (CurrentActivity->GetName() == "Pause")
 				{
 					if (CurrentActivity->GetLengthMode() != Schedule::Activity::LengthMode::FIXED)
 					{
-						ActiveBreak = CurrentActivity;
-						ActiveBreakIterator = ActivityIterator;
+						ActivePause = CurrentActivity;
+						ActivePauseIterator = ActivityIterator;
 					}
 
-					// Only check the first break we come to
+					// Only check the first pause we come to
 					break;
 				}
 			}
@@ -718,23 +715,19 @@ int main(int argc, char **argv)
 		}
 
 
-		// Close the active break if there is one
-		if (ActiveBreak != nullptr)
+		// Close the active pause if there is one
+		if (ActivePause != nullptr)
 		{
-			Schedule::Duration const BreakLength = BeginOffset - ActiveBreak->GetActualStartTime();
+			Schedule::Duration const PauseLength = BeginOffset - ActivePause->GetActualStartTime();
 
-			if (BreakLength.IsNegative())
+			if (PauseLength.IsNegative())
 			{
-				std::cerr << "The beginning time is earlier than the active pause or stop." << std::endl;
+				std::cerr << "The beginning time is earlier than the active pause." << std::endl;
 				return 2;
 			}
-			else if (ActiveBreak->GetName() == "Stop")
-			{
-				// XXX Delete activities between active stop and begin time
-			}
 
-			ActiveBreak->SetDesiredLength(BreakLength);
-			ActiveBreak->SetLengthMode(Schedule::Activity::LengthMode::FIXED);
+			ActivePause->SetDesiredLength(PauseLength);
+			ActivePause->SetLengthMode(Schedule::Activity::LengthMode::FIXED);
 		}
 
 
@@ -758,16 +751,16 @@ int main(int argc, char **argv)
 											  ActivityIterator != CurrentSchedule.end();
 											  Previous = ActivityIterator++)
 			{
-				if ((*ActivityIterator)->GetName() == "Pause" || (*ActivityIterator)->GetName() == "Stop")
+				if ((*ActivityIterator)->GetName() == "Pause")
 				{
-					// Delete the break
+					// Delete the pause
 					{
-						Schedule::Activity * const Break = *ActivityIterator;
+						Schedule::Activity * const Pause = *ActivityIterator;
 						ActivityIterator = CurrentSchedule.erase(ActivityIterator);
-						delete Break;
+						delete Pause;
 					}
 
-					// Delete the second half of an activity that was split by the break
+					// Delete the second half of an activity that was split by the pause
 					if (Previous != CurrentSchedule.end() &&
 						ActivityIterator != CurrentSchedule.end() &&
 						(*Previous)->GetName() == (*ActivityIterator)->GetName())
@@ -811,37 +804,37 @@ int main(int argc, char **argv)
 	}
 
 
-	else if (Command == "pause" || Command == "stop")
+	else if (Command == "pause")
 	{
 		if (CurrentSchedule.size() == 0)
 		{
-			std::cerr << "The schedule is empty.  Cannot " << Command << "." << std::endl;
+			std::cerr << "The schedule is empty.  Cannot pause." << std::endl;
 			return 2;
 		}
 
 
-		// Get the break time and check for sanity
-		Schedule::Offset BreakTime;
+		// Get the pause time and check for sanity
+		Schedule::Offset PauseTime;
 		{
 			std::string Next;
 			if (!Get(Argument, Next))
-				BreakTime = Schedule::Offset::GetLocalTimeOfDay();
+				PauseTime = Schedule::Offset::GetLocalTimeOfDay();
 			else
-				BreakTime = OffsetTranslator::ToOffset(Next);
+				PauseTime = OffsetTranslator::ToOffset(Next);
 
-			if (BreakTime < CurrentSchedule.front()->GetActualStartTime() ||
-				BreakTime >= CurrentSchedule.back()->GetActualStartTime() + CurrentSchedule.back()->GetActualLength())
+			if (PauseTime < CurrentSchedule.front()->GetActualStartTime() ||
+				PauseTime >= CurrentSchedule.back()->GetActualStartTime() + CurrentSchedule.back()->GetActualLength())
 			{
-				std::cerr << "The " << Command << " time is outside of the schedule.  Cannot " << Command << "." << std::endl;
+				std::cerr << "The pause time is outside of the schedule.  Cannot pause." << std::endl;
 				return 2;
 			}
 
 			for (auto Activity : CurrentSchedule)
 			{
-				if ((Activity->GetName() == "Pause" || Activity->GetName() == "Stop") &&
-					 Activity->GetLengthMode() != Schedule::Activity::LengthMode::FIXED)
+				if (Activity->GetName() == "Pause" &&
+					Activity->GetLengthMode() != Schedule::Activity::LengthMode::FIXED)
 				{
-					std::cerr << "There is already an active pause or stop in the schedule.  Cannot " << Command << "." << std::endl;
+					std::cerr << "There is already an active pause in the schedule.  Cannot pause." << std::endl;
 					return 2;
 				}
 			}
@@ -857,7 +850,7 @@ int main(int argc, char **argv)
 													  ActivityIterator != CurrentSchedule.rend();
 													  ++ActivityIterator)
 			{
-				if ((*ActivityIterator)->GetActualStartTime() <= BreakTime)
+				if ((*ActivityIterator)->GetActualStartTime() <= PauseTime)
 				{
 					BeforeActivity = *ActivityIterator;
 					BeforeActivityIterator = ActivityIterator;
@@ -869,13 +862,13 @@ int main(int argc, char **argv)
 		}
 
 
-		// Split the activity and insert the break
+		// Split the activity and insert the pause
 		{
 			std::string const			BeforeName = BeforeActivity->GetName();
 			bool const					BeforeFixedLength = (BeforeActivity->GetLengthMode() == Schedule::Activity::LengthMode::FIXED);
-			Schedule::Duration const	BeforeLength = BreakTime - BeforeActivity->GetActualStartTime();
+			Schedule::Duration const	BeforeLength = PauseTime - BeforeActivity->GetActualStartTime();
 			Schedule::Duration const	BeforeDesiredLength = BeforeActivity->GetDesiredLength();
-			Schedule::Duration const	AfterLength = BeforeActivity->GetActualStartTime() + BeforeActivity->GetActualLength() - BreakTime;
+			Schedule::Duration const	AfterLength = BeforeActivity->GetActualStartTime() + BeforeActivity->GetActualLength() - PauseTime;
 
 			if (BeforeLength.IsZero())
 			{
@@ -891,13 +884,13 @@ int main(int argc, char **argv)
 			}
 
 			{
-				Schedule::Activity * const BreakActivity = new Schedule::Activity;
-				BreakActivity->SetName(Command == "pause" ? "Pause" : "Stop");
-				BreakActivity->SetDesiredStartTime(BreakTime);
-				BreakActivity->SetStartMode(Schedule::Activity::StartMode::FIXED_ABSOLUTE);
-				BreakActivity->SetDesiredLength(Schedule::Duration());
+				Schedule::Activity * const PauseActivity = new Schedule::Activity;
+				PauseActivity->SetName("Pause");
+				PauseActivity->SetDesiredStartTime(PauseTime);
+				PauseActivity->SetStartMode(Schedule::Activity::StartMode::FIXED_ABSOLUTE);
+				PauseActivity->SetDesiredLength(Schedule::Duration());
 
-				CurrentSchedule.insert(NextActivityIterator, BreakActivity);
+				CurrentSchedule.insert(NextActivityIterator, PauseActivity);
 			}
 
 			if (!AfterLength.IsZero())
